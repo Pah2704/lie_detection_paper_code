@@ -85,6 +85,23 @@ The decision threshold is selected on validation balanced accuracy with a
 macro-F1 tie-break. This is threshold selection, not fitted probability
 calibration. Original config names are retained for source traceability.
 
+## Archived config fields and executed settings
+
+The YAML files are the archived experiment inputs. Three legacy fields do not
+control the executable trainer in `src/train_multimodal.py`:
+
+| Archived field | Executed behavior |
+| --- | --- |
+| `training.lr_unfrozen_backbone: 0.00001` | Unused. All trainable parameters share one AdamW group at `training.lr_head`, which is 0.001 in the main paper configurations. Frozen backbones are excluded from optimization. |
+| `training.scheduler: cosine_warmup` | Unused label. The trainer constructs `CosineAnnealingWarmRestarts(optimizer, T_0=10)` directly. |
+| `training.warmup_epochs: 3` | Unused. The trainer does not implement a separate three-epoch warmup phase. |
+
+The original YAML files are deliberately unchanged so the experiment inputs
+remain traceable. Editing these unused fields does not alter training behavior.
+The manuscript describes the executable optimizer and scheduler. The regression
+checks in `tests/test_release.py` verify this code/config distinction; this
+documentation update changes neither the model implementation nor stored results.
+
 ## Aggregate result checks
 
 ```bash

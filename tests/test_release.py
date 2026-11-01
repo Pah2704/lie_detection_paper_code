@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import unittest
 from pathlib import Path
@@ -25,6 +26,30 @@ class ReleaseGuardTests(unittest.TestCase):
 
     def test_rejects_media(self):
         self.assertTrue(guard.inspect('sample.wav', b'RIFF'))
+
+
+class ArchivedConfigDocumentationTests(unittest.TestCase):
+    def setUp(self):
+        self.tree = ast.parse((ROOT / 'src/train_multimodal.py').read_text())
+
+    def test_legacy_training_keys_are_not_consumed(self):
+        strings = {node.value for node in ast.walk(self.tree)
+                   if isinstance(node, ast.Constant) and isinstance(node.value, str)}
+        for key in ['lr_unfrozen_backbone', 'scheduler', 'warmup_epochs']:
+            self.assertNotIn(key, strings)
+
+    def test_executable_optimizer_and_scheduler(self):
+        calls = [node for node in ast.walk(self.tree) if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Attribute)]
+        optimizers = [node for node in calls if node.func.attr == 'AdamW']
+        self.assertEqual(len(optimizers), 1)
+        learning_rate = next(k.value for k in optimizers[0].keywords if k.arg == 'lr')
+        self.assertIn('lr_head', {n.value for n in ast.walk(learning_rate)
+                                  if isinstance(n, ast.Constant)})
+        schedulers = [node for node in calls if node.func.attr == 'CosineAnnealingWarmRestarts']
+        self.assertEqual(len(schedulers), 1)
+        period = next(k.value for k in schedulers[0].keywords if k.arg == 'T_0')
+        self.assertEqual(ast.literal_eval(period), 10)
 
 
 if __name__ == '__main__':
